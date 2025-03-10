@@ -251,8 +251,55 @@ void q_reverseK(struct list_head *head, int k)
     head->prev->next = head;
 }
 
+struct list_head *q_find_mid(struct list_head *head)
+{
+    if (!head || list_empty(head))
+        return NULL;
+    struct list_head *slow = head->next;
+    struct list_head *fast = head->next;
+    for (; fast != head && fast->next != head;
+         slow = slow->next, fast = fast->next->next)
+        ;
+    return slow;
+}
+
 /* Sort elements of queue in ascending/descending order */
-void q_sort(struct list_head *head, bool descend) {}
+void q_sort(struct list_head *head, bool descend)
+{
+    if (!head || head->next == head || list_is_singular(head))
+        return;
+
+    LIST_HEAD(new_head);
+    struct list_head *mid = q_find_mid(head);
+    list_cut_position(&new_head, head, mid->prev);
+
+    q_sort(head, descend);
+    q_sort(&new_head, descend);
+
+    struct list_head *temp;
+    struct list_head *node1 = head->next;
+    struct list_head *node2 = new_head.next;
+    while (node1 != head && node2 != &new_head) {
+        const element_t *e1 = list_entry(node1, element_t, list);
+        const element_t *e2 = list_entry(node2, element_t, list);
+        if (descend ? strcmp(e1->value, e2->value) > 0
+                    : strcmp(e1->value, e2->value) < 0) {
+            node1 = node1->next;
+        } else {
+            temp = node2->next;
+            list_del(node2);
+            node1->prev->next = node2;
+            node2->prev = node1->prev;
+            node1->prev = node2;
+            node2->next = node1;
+            node2 = temp;
+        }
+    }
+
+    if (node1 == head) {
+        list_splice_tail_init(&new_head, head);
+    }
+}
 
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
@@ -323,5 +370,33 @@ int q_descend(struct list_head *head)
 int q_merge(struct list_head *head, bool descend)
 {
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+
+    queue_contex_t *first = list_first_entry(head, queue_contex_t, chain);
+
+    if (list_is_singular(head)) {
+        if (first->q)
+            q_sort(first->q, descend);
+        return first->size;
+    }
+
+    struct list_head *pos, *n;
+    for (pos = head->next; pos != head; pos = n) {
+        n = pos->next;
+        queue_contex_t *qc = list_entry(pos, queue_contex_t, chain);
+        if (qc == first)
+            continue;
+
+        if (qc->q && !list_empty(qc->q)) {
+            list_splice_init(qc->q, first->q);
+            first->size += qc->size;
+        }
+        qc->q = NULL;
+        qc->size = 0;
+    }
+
+    q_sort(first->q, descend);
+
+    return first->size;
 }
