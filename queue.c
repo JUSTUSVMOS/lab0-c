@@ -162,12 +162,19 @@ bool q_delete_dup(struct list_head *head)
     while (curr != head) {
         struct list_head *nxt = curr->next;
         const element_t *e_curr = list_entry(curr, element_t, list);
-        if (strcmp(e_curr->value, list_entry(nxt, element_t, list)->value) ==
-            0) {
-            while (strcmp(e_curr->value,
+        if (nxt != head &&
+            strcmp(e_curr->value, list_entry(nxt, element_t, list)->value) ==
+                0) {
+            while (nxt != head &&
+                   strcmp(e_curr->value,
                           list_entry(nxt, element_t, list)->value) == 0) {
+                struct list_head *to_delete = nxt;
                 nxt = nxt->next;
+                list_del(to_delete);
+                q_release_element(list_entry(to_delete, element_t, list));
             }
+            list_del(curr);
+            q_release_element(list_entry(curr, element_t, list));
             prev->next = nxt;
             nxt->prev = prev;
             curr = nxt;
@@ -176,8 +183,10 @@ bool q_delete_dup(struct list_head *head)
             curr = nxt;
         }
     }
+
     return true;
 }
+
 /* Swap every two adjacent nodes */
 void q_swap(struct list_head *head)
 {
@@ -392,7 +401,6 @@ int q_merge(struct list_head *head, bool descend)
             list_splice_init(qc->q, first->q);
             first->size += qc->size;
         }
-        qc->q = NULL;
         qc->size = 0;
     }
 
